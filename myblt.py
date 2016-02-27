@@ -72,14 +72,19 @@ def get_extension(filename):
 
 
 def create_thumbnail(abs_orig, abs_thumbnail):
+    if not os.path.isdir(os.path.dirname(abs_thumbnail)):
+        os.makedirs(os.path.dirname(abs_thumbnail))
+
     with Image(filename=abs_orig) as img:
         with img.clone() as i:
-            height = 150
-            ratio = height / img.height
-            width = ratio * img.ratio
+            height = 200
 
-            i.resize(height, width)
-            i.save(filename='mona-lisa-{0}.jpg')
+            if img.height > height:
+                ratio = img.height / height
+                width = int(img.width / ratio)
+                i.resize(width, height)
+
+            i.save(filename=abs_thumbnail)
 
 
 def new_upload(file, file_hash_bin):
