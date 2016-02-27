@@ -7,11 +7,12 @@ from database import metadata, db_session
 class Upload():
     query = db_session.query_property()
 
-    def __init__(self, hash, short_url, mime_type, thumbnail_url):
+    def __init__(self, hash, short_url, mime_type, thumbnail_url, public):
         self.hash = hash
         self.short_url = short_url
         self.mime_type = mime_type
         self.thumbnail_url = thumbnail_url
+	self.public = public
 
     def __repr__(self):
         return '<Upload %r>' % (self.hash)
@@ -36,6 +37,7 @@ uploads = Table('uploads', metadata,
                 Column('thumbnail_url', String(255)),
                 Column('mime_type', String(255)),
                 Column('blocked', Boolean, default=False),
+	 	Column('public', Boolean, default=True),
                 )
 
 users = Table('users', metadata,
