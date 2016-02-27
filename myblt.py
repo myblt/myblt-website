@@ -68,7 +68,7 @@ def get_extension(filename):
             return ext
 
 
-def new_upload(file, file_hash_bin):
+def new_upload(file, file_hash_bin, public):
     file_hash_str = str(binascii.hexlify(file_hash_bin).decode('utf8'))
     abs_file = os.path.join(app.config['UPLOAD_FOLDER'], file_hash_str)
 
@@ -87,7 +87,7 @@ def new_upload(file, file_hash_bin):
         full_id = short_id
 
     # Add upload in DB
-    upload = Upload(file_hash_bin, full_id, file.mimetype)
+    upload = Upload(file_hash_bin, full_id, file.mimetype, True)
     db_session.add(upload)
     db_session.commit()
 
@@ -135,7 +135,7 @@ def upload_file():
         # Get old (identical) file's short_url from the hash
         upload = Upload.query.filter(Upload.hash == file_hash_bin).first()
     else:
-        upload = new_upload(file, file_hash_bin)
+        upload = new_upload(file, file_hash_bin, True)
 
     if not upload:
         return jsonify({'error': 'An unknown error occurred'}), 500
@@ -175,6 +175,18 @@ def get_uploads():
             "blocked": upload.blocked
         })
     return jsonify(uploads=objects)
+    
+    
+    @app.route('/uploads/public', methods=['GET'])
+    def get_public_uploads():
+        uploads = Upload.query.filter(Upload.public == True)
+        objects = []
+        for upload in uploads:
+            objects.append({
+                "short_url": upload.short_url,
+                "blocked": upload.blocked
+            })
+        return jsonify(uploads=objects)
 
 
 @app.route('/block/<short_url>', methods=['GET'])
