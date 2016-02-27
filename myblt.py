@@ -9,6 +9,9 @@ import sys
 from flask import Flask, request, send_from_directory, jsonify, redirect
 from database import db_session, init_db, init_engine
 
+from wand.image import Image
+from wand.display import display
+
 from models import Upload, User
 
 app = Flask(__name__)
@@ -68,15 +71,31 @@ def get_extension(filename):
             return ext
 
 
+def create_thumbnail(abs_orig, abs_thumbnail):
+    with Image(filename=abs_orig) as img:
+        with img.clone() as i:
+            height = 150
+            ratio = height / img.height
+            width = ratio * img.ratio
+
+            i.resize(height, width)
+            i.save(filename='mona-lisa-{0}.jpg')
+
+
 def new_upload(file, file_hash_bin):
     file_hash_str = str(binascii.hexlify(file_hash_bin).decode('utf8'))
-    abs_file = os.path.join(app.config['UPLOAD_FOLDER'], file_hash_str)
+    abs_orig = os.path.join(app.config['UPLOAD_FOLDER'], file_hash_str)
 
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
         os.makedirs(app.config['UPLOAD_FOLDER'])
 
     file.stream.seek(0)
-    file.save(abs_file)
+    file.save(abs_orig)
+
+    abs_thumbnail = os.path.join(app.config['UPLOAD_FOLDER'], 'thumbnail',
+                                 file_hash_str)
+
+    thumbnail_url = create_thumbnail(abs_orig, abs_thumbnail)
 
     # Generate a short id and append extension
     short_id = get_new_short_url()
@@ -87,7 +106,7 @@ def new_upload(file, file_hash_bin):
         full_id = short_id
 
     # Add upload in DB
-    upload = Upload(file_hash_bin, full_id, file.mimetype)
+    upload = Upload(file_hash_bin, full_id, thumbnail_url, file.mimetype)
     db_session.add(upload)
     db_session.commit()
 
@@ -143,6 +162,13 @@ def upload_file():
     return jsonify(short_url=app.config['API_URL'] + upload.short_url)
 
 
+@app.route('/<hash>/thumbnail', methods=['GET'])
+def get_thumbnail_from_hash(hash):
+    return send_from_directory(
+        app.config['UPLOAD_FOLDER'], 'thumbnail',
+        hash_str, mimetype=mimetype, as_attachment=False)
+
+
 @app.route('/<short_url>', methods=['GET'])
 def get_upload(short_url):
     upload = Upload.query.filter(Upload.short_url == short_url).first()
@@ -170,10 +196,13 @@ def get_uploads():
     uploads = Upload.query.all()
     objects = []
     for upload in uploads:
-        objects.append({
+        o = {
             "short_url": upload.short_url,
             "blocked": upload.blocked
-        })
+        }
+        if o.thumbnail_url:
+            o['thumbnail_url'] = o.thumbnail_url
+        objects.append(o)
     return jsonify(uploads=objects)
 
 
